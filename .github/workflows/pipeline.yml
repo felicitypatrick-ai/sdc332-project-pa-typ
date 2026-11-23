@@ -9,9 +9,16 @@ on:
 permissions:
   contents: read
 
+# A new push to the same pull request cancels the run that is now out of date.
+# Pushes to main are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Check out code
@@ -25,6 +32,7 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
+          set -o pipefail
           python -m unittest discover -s tests -v 2>&1 | tee test-results.txt
 
       - name: Write test results to run summary
@@ -43,11 +51,21 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Build release package
         run: python scripts/package.py
-
-      - name: Check the owner's rule
-        run: python scripts/rule_check.py all
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
@@ -56,3 +74,30 @@ jobs:
           path: dist/
           retention-days: 3
           if-no-files-found: error
+
+  rule-check:
+    name: Check the owner's rule (${{ matrix.check }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # Let every check finish and report, even if one of them fails.
+      fail-fast: false
+      matrix:
+        check: [capacity, limit, line]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Built here as well so each check sees the same dist/ it saw before,
+      # when it ran after the package build.
+      - name: Build release package
+        run: python scripts/package.py
+
+      - name: Check the owner's rule (${{ matrix.check }})
+        run: python scripts/rule_check.py ${{ matrix.check }}
