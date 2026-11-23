@@ -5,7 +5,7 @@ import shutil
 os.makedirs("dist", exist_ok=True)
 with open("VERSION") as f:
     version = f.read().strip()
-with open(os.path.join("dist", "BUILD_INFO.txt"), "w") as f:
+with open(os.path.join("build", "BUILD_INFO.txt"), "w") as f:
     f.write(f"Version {version}, built from commit {os.environ.get('GITHUB_SHA', 'local')}\n")
 count = 0
 for name in sorted(os.listdir("app")):

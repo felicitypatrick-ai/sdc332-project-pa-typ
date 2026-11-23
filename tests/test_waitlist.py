@@ -1,6 +1,6 @@
 import unittest
 
-from app.waitlist import waitlist_position
+from app.waitlists import waitlist_position
 
 
 class LineTests(unittest.TestCase):
